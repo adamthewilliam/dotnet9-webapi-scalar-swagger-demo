@@ -8,15 +8,17 @@ This project showcases a basic Web API setup with:
 
 *   **.NET 9:** Built using the latest .NET runtime.
 *   **Swagger/OpenAPI:** Uses Swashbuckle.AspNetCore to automatically generate an OpenAPI (Swagger) specification from your API's code.
-*   **Scalar UI:** Integrates Scalar UI to provide a visually appealing and interactive documentation experience, rendering the Swagger specification in a clean, modern interface.
+*   **Scalar UI:** Integrates Scalar UI to provide a visually appealing and interactive documentation experience, rendering the Swagger specification in a clean, modern interface.  Leverages custom extension methods for cleaner configuration.
 
 ## Key Components
 
-*   **`Alertu.ScalarSwagger.Api.csproj`:** The .NET project file.
+*   **`Dotnet9.WebApi.Scalar.Swagger.Demo.sln`:** The .NET solution file.
+*   **`Dotnet9.WebApi.Scalar.Swagger.Demo.csproj`:** The .NET project file.
 *   **`Controllers/`:** Contains the API controllers with decorated actions that Swagger uses to generate the OpenAPI specification.  Pay attention to the use of `[ProducesResponseType]` attributes to provide detailed information about the API responses.
 *   **`Contracts/Requests/` & `Contracts/Responses/`:** Defines the request and response DTOs (Data Transfer Objects) used by the API.
-*   **`Program.cs`:**  Configures Swagger and Scalar UI within the application's pipeline. This is where you'll find the settings for the `swagger.json` endpoint and the Scalar UI middleware.
-*   **`Swagger.json`:** The generated OpenAPI specification file.  This file describes your API's endpoints, request/response schemas, and other metadata.  It is generated on build.
+*   **`Extensions/OpenApiConfigurationExtensions.cs`:** Contains extension methods for configuring both Swagger and Scalar UI, promoting a cleaner `Program.cs` file.
+*   **`Program.cs`:**  Calls the extension methods from `OpenApiConfigurationExtensions.cs` to configure Swagger and Scalar UI.
+*   **`Swagger.json`:** The generated OpenAPI specification file.  This file describes your API's endpoints, request/response schemas, and other metadata. It is dynamically generated at runtime.
 *   **.config/dotnet-tools.json:** Lists the tools that are local to your project.
 *   **`.gitignore`:** Specifies intentionally untracked files that Git should ignore.
 
@@ -53,53 +55,65 @@ This project showcases a basic Web API setup with:
 
 ## Accessing the Documentation
 
-*   **Swagger UI:** After running the application, access the default Swagger UI at:
+*   **Scalar UI:** After running the application, access the Scalar UI at:
 
     ```
-    http://localhost:<port>/swagger
+    http://localhost:5063/swagger/index.html
     ```
 
-*   **Scalar UI:** Access the Scalar UI at:
+## Code Highlights
 
-    ```
-    http://localhost:<port>/scalar
-    ```
+### `Extensions/OpenApiConfigurationExtensions.cs`
 
-    (Replace `<port>` with the actual port your application is running on, typically 5000 or 5001).
+This file contains extension methods to encapsulate the Swagger and Scalar UI configuration:
 
-## Generating the `swagger.json` on Build (Important!)
+```csharp
+using Microsoft.OpenApi.Models;
+using Scalar.AspNetCore;
 
-This project is configured to automatically generate the `swagger.json` file during the build process. To achieve this, the following steps are required:
+namespace Dotnet9.WebApi.Scalar.Swagger.Demo.Extensions;
 
-1.  **Install the `Swashbuckle.AspNetCore.Cli` as a Local Tool:**
+public static class OpenApiConfigurationExtensions
+{
+    public static void AddOpenApiConfiguration(this IServiceCollection services)
+    {
+        services.AddOpenApi();
 
-    ```bash
-    dotnet new tool-manifest  # Creates a .config/dotnet-tools.json file
-    dotnet tool install --local Swashbuckle.AspNetCore.Cli
-    ```
+        /* This extension is responsible for crawling the controller action annotations
+        to generate the OpenApi specification */
+        services.AddEndpointsApiExplorer();
 
-2.  **The .csproj has the following XML added:**
+        services.AddSwaggerGen(options =>
+        {
+            options.SwaggerDoc("v1", new OpenApiInfo
+            {
+                Title = "v1 Penguins API",
+                Version = "v1",
+                Description = "An example ASP.NET Core Web API using Swagger with Scalar UI",
+            });
+        });
+    }
 
-    ```xml
-     <Target Name="OpenAPI" AfterTargets="Build" Condition="'$(Configuration)'=='Debug'">
-        <Exec Command="dotnet swagger tofile --output Swagger.json bin/Debug/net9.0/Alertu.ScalarSwagger.Api.dll v1" WorkingDirectory="$(ProjectDir)" EnvironmentVariables="DOTNET_ROLL_FORWARD=LatestMajor" />
-    </Target>
-    ```
+    public static void AddScalarUiConfiguration(this WebApplication app)
+    {
+        if (!app.Environment.IsDevelopment()) return;
 
-## Configuration
+        // Enable Swagger
+        app.UseSwagger();
 
-### Swagger
+        app.MapOpenApi().CacheOutput();
 
-Swagger is configured using Swashbuckle.AspNetCore.  You can customize the Swagger generation process by modifying the `AddSwaggerGen` options in `Program.cs`.
+        // Enable Scalar UI
+        app.MapScalarApiReference(options =>
+        {
+            options
+                .WithTitle("v1 Penguins API")
+                .WithTheme(ScalarTheme.DeepSpace)
+                .WithDefaultHttpClient(ScalarTarget.CSharp, ScalarClient.HttpClient)
+                .WithOpenApiRoutePattern("/swagger/v1/swagger.json"); // Setup Scalar UI to route to swagger.json
 
-### Scalar UI
-
-Scalar UI is configured via the `app.UseScalar()` middleware in `Program.cs`.  The key setting is `options.SpecUrl`, which specifies the location of the `swagger.json` file.  You can also customize the document title and other Scalar UI options here.
-
-## Contributing
-
-Feel free to contribute to this project by submitting pull requests with improvements, bug fixes, or new features.
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
+            options.Servers ??= new List<ScalarServer>();
+            options.Servers.Add(new ScalarServer("http://localhost:5063"));
+        });
+    }
+}
