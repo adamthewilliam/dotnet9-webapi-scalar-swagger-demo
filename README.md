@@ -58,7 +58,7 @@ This project showcases a basic Web API setup with:
 *   **Scalar UI:** After running the application, access the Scalar UI at:
 
     ```
-    http://localhost:5063/swagger/index.html
+    http://localhost:5199/swagger/v1/swagger.json
     ```
 
 ## Code Highlights
