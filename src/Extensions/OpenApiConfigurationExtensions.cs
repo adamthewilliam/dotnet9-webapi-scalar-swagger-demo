@@ -43,7 +43,7 @@ public static class OpenApiConfigurationExtensions
                 .WithOpenApiRoutePattern("/swagger/v1/swagger.json"); // Setup Scalar UI to route to swagger.json
 
             options.Servers ??= new List<ScalarServer>();
-            options.Servers.Add(new ScalarServer("http://localhost:5063"));
+            options.Servers.Add(new ScalarServer("http://localhost:5199"));
         });
     }
 }
